@@ -1,8 +1,9 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { groupAPI } from '../services/api';
 import { SupportGroup, GroupMessage } from '../types';
 import { useAuth } from '../context/AuthContext';
+import CheckInPanel from '../components/CheckInPanel';
 
 const GroupDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -13,22 +14,25 @@ const GroupDetailPage: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
 
-  useEffect(() => {
-    const fetchGroup = async () => {
-      try {
-        const response = await groupAPI.getGroup(id!);
-        setGroup(response.data);
-        if (user) {
-          setIsMember(response.data.members?.some((m: any) => m.userId === user.id) || false);
-        }
-      } catch (error) {
-        console.error('获取小组详情失败:', error);
-      } finally {
-        setLoading(false);
+  const fetchGroup = useCallback(async () => {
+    try {
+      const response = await groupAPI.getGroup(id!);
+      setGroup(response.data);
+      if (user) {
+        setIsMember(response.data.members?.some((m: any) => m.userId === user.id) || false);
       }
-    };
-    fetchGroup();
+      return response.data;
+    } catch (error) {
+      console.error('获取小组详情失败:', error);
+    } finally {
+      setLoading(false);
+    }
   }, [id, user]);
+
+  useEffect(() => {
+    setLoading(true);
+    fetchGroup();
+  }, [fetchGroup]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -127,6 +131,8 @@ const GroupDetailPage: React.FC = () => {
               </button>
             )}
           </div>
+
+          <CheckInPanel group={group} isMember={isMember} onGroupChanged={fetchGroup} />
 
           <div className="bg-white rounded-lg shadow-md">
             <div className="p-6 border-b">

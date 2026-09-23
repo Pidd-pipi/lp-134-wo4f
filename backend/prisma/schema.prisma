@@ -45,6 +45,12 @@ enum CheckInStatus {
   MISSED
 }
 
+enum MakeupRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model User {
   id              String          @id @default(uuid())
   username        String          @unique
@@ -65,8 +71,10 @@ model User {
   appointmentsAsCounselor Appointment[] @relation("CounselorAppointments")
   groupMemberships GroupMember[]
   checkIns        CheckIn[]
+  makeupRequests  MakeupRequest[]
   favorites       Favorite[]
   sentMessages    GroupMessage[]
+  reviewedMakeupRequests MakeupRequest[] @relation("MakeupReviewer")
   crisisAlerts    CrisisAlert[]
   
   @@map("users")
@@ -222,7 +230,8 @@ model SupportGroup {
   members         GroupMember[]
   messages        GroupMessage[]
   checkInTemplates CheckInTemplate[]
-  
+  makeupRequests  MakeupRequest[]
+
   @@map("support_groups")
 }
 
@@ -236,7 +245,8 @@ model GroupMember {
   group           SupportGroup    @relation(fields: [groupId], references: [id])
   user            User            @relation(fields: [userId], references: [id])
   checkIns        CheckIn[]
-  
+  makeupRequests  MakeupRequest[]
+
   @@unique([groupId, userId])
   @@map("group_members")
 }
@@ -261,10 +271,11 @@ model CheckInTemplate {
   description     String?
   reminderTime    String
   createdAt       DateTime        @default(now())
-  
+
   group           SupportGroup    @relation(fields: [groupId], references: [id])
   checkIns        CheckIn[]
-  
+  makeupRequests  MakeupRequest[]
+
   @@map("checkin_templates")
 }
 
@@ -273,16 +284,48 @@ model CheckIn {
   templateId      String
   memberId        String
   userId          String
+  checkDate       DateTime
   status          CheckInStatus
   response        String?
   moodRating      Int?
+  isMakeup        Boolean         @default(false)
+  makeupReason    String?
   createdAt       DateTime        @default(now())
-  
+
   template        CheckInTemplate @relation(fields: [templateId], references: [id])
   member          GroupMember     @relation(fields: [memberId], references: [id])
   user            User            @relation(fields: [userId], references: [id])
-  
+
+  // 每项模板每人每个自然日只能有一条记录
+  @@unique([templateId, memberId, checkDate])
   @@map("checkins")
+}
+
+model MakeupRequest {
+  id              String              @id @default(uuid())
+  templateId      String
+  memberId        String
+  userId          String
+  groupId         String
+  checkDate       DateTime
+  reason          String
+  status          MakeupRequestStatus @default(PENDING)
+  reviewerId      String?
+  reviewComment   String?
+  reviewedAt      DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  // 待审申请占用该键，审核后置空；配合部分唯一索引保证同模板同日期仅一条待审
+  pendingKey      String?             @unique
+
+  template        CheckInTemplate     @relation(fields: [templateId], references: [id])
+  member          GroupMember         @relation(fields: [memberId], references: [id])
+  user            User                @relation(fields: [userId], references: [id])
+  group           SupportGroup        @relation(fields: [groupId], references: [id])
+  reviewer        User?               @relation("MakeupReviewer", fields: [reviewerId], references: [id])
+
+  @@index([groupId, status])
+  @@map("makeup_requests")
 }
 
 model Favorite {
