@@ -1,8 +1,9 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { groupAPI } from '../services/api';
 import { SupportGroup, GroupMessage } from '../types';
 import { useAuth } from '../context/AuthContext';
+import CheckInSection from '../components/CheckInSection';
 
 const GroupDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -10,25 +11,32 @@ const GroupDetailPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [newMessage, setNewMessage] = useState('');
   const [isMember, setIsMember] = useState(false);
+  const [myRole, setMyRole] = useState<string>('member');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
 
+  const fetchGroup = useCallback(async () => {
+    const response = await groupAPI.getGroup(id!);
+    setGroup(response.data);
+    if (user) {
+      const membership = response.data.members?.find((m: any) => m.userId === user.id);
+      setIsMember(!!membership);
+      setMyRole(membership?.role || 'member');
+    }
+  }, [id, user]);
+
   useEffect(() => {
-    const fetchGroup = async () => {
+    const load = async () => {
       try {
-        const response = await groupAPI.getGroup(id!);
-        setGroup(response.data);
-        if (user) {
-          setIsMember(response.data.members?.some((m: any) => m.userId === user.id) || false);
-        }
+        await fetchGroup();
       } catch (error) {
         console.error('获取小组详情失败:', error);
       } finally {
         setLoading(false);
       }
     };
-    fetchGroup();
-  }, [id, user]);
+    load();
+  }, [fetchGroup]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -37,9 +45,7 @@ const GroupDetailPage: React.FC = () => {
   const handleJoinGroup = async () => {
     try {
       await groupAPI.joinGroup(id!);
-      const response = await groupAPI.getGroup(id!);
-      setGroup(response.data);
-      setIsMember(true);
+      await fetchGroup();
       alert('加入小组成功！');
     } catch (error: any) {
       alert(error.response?.data?.error || '加入失败');
@@ -53,8 +59,7 @@ const GroupDetailPage: React.FC = () => {
     try {
       await groupAPI.sendMessage(id!, { content: newMessage });
       setNewMessage('');
-      const response = await groupAPI.getGroup(id!);
-      setGroup(response.data);
+      await fetchGroup();
     } catch (error: any) {
       alert(error.response?.data?.error || '发送失败');
     }
@@ -127,6 +132,17 @@ const GroupDetailPage: React.FC = () => {
               </button>
             )}
           </div>
+
+          {user && isMember && group.checkInTemplates && (
+            <CheckInSection
+              groupId={group.id}
+              templates={group.checkInTemplates}
+              members={group.members || []}
+              currentUser={user}
+              myRole={myRole}
+              onChanged={fetchGroup}
+            />
+          )}
 
           <div className="bg-white rounded-lg shadow-md">
             <div className="p-6 border-b">

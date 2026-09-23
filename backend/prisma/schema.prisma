@@ -45,6 +45,12 @@ enum CheckInStatus {
   MISSED
 }
 
+enum MakeUpStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model User {
   id              String          @id @default(uuid())
   username        String          @unique
@@ -65,6 +71,7 @@ model User {
   appointmentsAsCounselor Appointment[] @relation("CounselorAppointments")
   groupMemberships GroupMember[]
   checkIns        CheckIn[]
+  makeUpRequests  MakeUpRequest[]
   favorites       Favorite[]
   sentMessages    GroupMessage[]
   crisisAlerts    CrisisAlert[]
@@ -236,7 +243,8 @@ model GroupMember {
   group           SupportGroup    @relation(fields: [groupId], references: [id])
   user            User            @relation(fields: [userId], references: [id])
   checkIns        CheckIn[]
-  
+  makeUpRequests  MakeUpRequest[]
+
   @@unique([groupId, userId])
   @@map("group_members")
 }
@@ -264,7 +272,8 @@ model CheckInTemplate {
   
   group           SupportGroup    @relation(fields: [groupId], references: [id])
   checkIns        CheckIn[]
-  
+  makeUpRequests  MakeUpRequest[]
+
   @@map("checkin_templates")
 }
 
@@ -273,16 +282,44 @@ model CheckIn {
   templateId      String
   memberId        String
   userId          String
+  checkDate       DateTime        @db.Date
   status          CheckInStatus
   response        String?
   moodRating      Int?
+  isMakeUp        Boolean         @default(false)
+  makeUpReason    String?
   createdAt       DateTime        @default(now())
-  
+
   template        CheckInTemplate @relation(fields: [templateId], references: [id])
   member          GroupMember     @relation(fields: [memberId], references: [id])
   user            User            @relation(fields: [userId], references: [id])
-  
+
+  @@unique([templateId, memberId, checkDate])
+  @@index([memberId, checkDate])
   @@map("checkins")
+}
+
+model MakeUpRequest {
+  id              String          @id @default(uuid())
+  templateId      String
+  memberId        String
+  userId          String
+  checkDate       DateTime        @db.Date
+  reason          String
+  status          MakeUpStatus    @default(PENDING)
+  reviewComment   String?
+  reviewedBy      String?
+  reviewedAt      DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  template        CheckInTemplate @relation(fields: [templateId], references: [id])
+  member          GroupMember     @relation(fields: [memberId], references: [id])
+  user            User            @relation(fields: [userId], references: [id])
+
+  @@index([templateId, status])
+  @@index([memberId, checkDate])
+  @@map("makeup_requests")
 }
 
 model Favorite {

@@ -95,6 +95,7 @@ export interface SupportGroup {
   createdAt: string;
   members: GroupMember[];
   messages?: GroupMessage[];
+  checkInTemplates?: CheckInTemplate[];
   _count?: { members: number };
 }
 
@@ -114,6 +115,49 @@ export interface GroupMessage {
   content: string;
   createdAt: string;
   user: User;
+}
+
+export type CheckInStatus = 'COMPLETED' | 'MISSED';
+export type MakeUpStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export interface CheckIn {
+  id: string;
+  templateId: string;
+  memberId: string;
+  userId: string;
+  checkDate: string;
+  status: CheckInStatus;
+  response: string | null;
+  moodRating: number | null;
+  isMakeUp: boolean;
+  makeUpReason: string | null;
+  createdAt: string;
+}
+
+export interface MakeUpRequest {
+  id: string;
+  templateId: string;
+  memberId: string;
+  userId: string;
+  checkDate: string;
+  reason: string;
+  status: MakeUpStatus;
+  reviewComment: string | null;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+  user?: Pick<User, 'id' | 'username' | 'nickname' | 'avatar'>;
+}
+
+export interface CheckInTemplate {
+  id: string;
+  groupId: string;
+  title: string;
+  description: string | null;
+  reminderTime: string;
+  createdAt: string;
+  checkIns?: CheckIn[];
+  makeUpRequests?: MakeUpRequest[];
 }
 
 export interface Favorite {
